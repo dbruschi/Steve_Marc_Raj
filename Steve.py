@@ -65,7 +65,7 @@ parser = common_parser()
 
 parser.add_argument("-e","--efficiency",
 		    help="1 for reco, 2 for 'tracking', 3 for idip, 4 for trigger, 5 for isolation, 6 for isolation without trigger, 7 for isolation with failing trigger, 8 for veto (loose ID+dxybs<0.05) on top of global muons, 9 for P(tracker-seeded track | Standalone muon), 10 for p(tracker muon and not global| tracker-seeded track), 11 for veto on top of 'global or tracker' ",
-                    type=int, choices=range(1,12))
+                    type=int, choices=[*range(1,12),20])
 parser.add_argument("--testVetoStrategy",
                     default=0,
 		    help="Different definition for test veto efficiency measurement (check code for details)",
@@ -523,7 +523,7 @@ elif args.efficiency==2:
         pass_histogram_norm.Write()
 
 ## Muons for all other nominal efficiency steps including veto on top of tracking
-elif args.efficiency < 9:
+elif (args.efficiency < 9) or args.efficiency == 20:
     
     if not args.isData:
         d = d.Define("GenMatchedIdx","GenMatchedIdx(GenMuonBare_eta, GenMuonBare_phi, Muon_eta, Muon_phi)")
@@ -984,6 +984,52 @@ elif args.efficiency < 9:
 
             pass_histogram_reco.Write()
             pass_histogram_norm.Write()
+
+    if (args.efficiency == 20):
+        if not (args.genLevelEfficiency):
+            d = d.Define("goodStandaloneMuon", f"MergedStandAloneMuon_pt > {minStandalonePt} && MergedStandAloneMuon_numberOfValidHits >= {minStandaloneNumberOfValidHits}")
+            d = d.Define("Muon_CloneSAIdx", "trackStandaloneDRWithExtra_MuonIdx(Muon_eta, Muon_phi, Muon_standaloneExtraIdx, MergedStandAloneMuon_eta[goodStandaloneMuon], MergedStandAloneMuon_phi[goodStandaloneMuon], MergedStandAloneMuon_extraIdx[goodStandaloneMuon])")
+            d = d.Define("Muon_CloneSAPt",  "trackStandaloneDRWithExtra_matchedObjectVar(Muon_CloneSAIdx, MergedStandAloneMuon_pt[goodStandaloneMuon])")
+            d = d.Define("Muon_CloneSAEta", "trackStandaloneDRWithExtra_matchedObjectVar(Muon_CloneSAIdx, MergedStandAloneMuon_eta[goodStandaloneMuon])")
+            d = d.Define("Muon_CloneSAPhi", "trackStandaloneDRWithExtra_matchedObjectVar(Muon_CloneSAIdx, MergedStandAloneMuon_phi[goodStandaloneMuon])")
+            #d = d.Define("passCondition_clone", "(deltaSApt(Muon_standalonePt, Muon_CloneSAPt) < 30) && (trackStandaloneDRWithExtra(Muon_eta, Muon_phi, Muon_standaloneExtraIdx, MergedStandAloneMuon_eta[goodStandaloneMuon], MergedStandAloneMuon_phi[goodStandaloneMuon], MergedStandAloneMuon_extraIdx[goodStandaloneMuon]) < 0.3)")
+            d = d.Define("passCondition_clone", "trackStandaloneDRWithExtra(Muon_eta, Muon_phi, Muon_standaloneExtraIdx, MergedStandAloneMuon_eta[goodStandaloneMuon], MergedStandAloneMuon_phi[goodStandaloneMuon], MergedStandAloneMuon_extraIdx[goodStandaloneMuon]) < 0.3")
+            d = d.Define("Muon_CloneGlobal", "cloneglobal(Muon_CloneSAIdx, Muon_isGlobal, Muon_standaloneExtraIdx, Muon_pt, MergedStandAloneMuon_extraIdx[goodStandaloneMuon])")
+            d = d.Define("TPmasscloneSA",    "getTPmass(TPPairs, Tag_pt, Tag_eta, Tag_phi, Muon_CloneSAPt, Muon_CloneSAEta, Muon_CloneSAPhi)")
+            d = d.Define("passTPmassclone", "TPmasscloneSA >= 50 && TPmasscloneSA <= 130")
+            
+            # define condition for passing probes
+            #d = d.Define("passCondition_IDIPTrigIso", "passCondition_IDIP && passCondition_Iso && (passCondition_clone && Muon_CloneGlobal)")
+            #d = d.Define("failCondition_IDIPTrigIso", "passCondition_IDIP && passCondition_Iso && !(passCondition_clone && Muon_CloneGlobal)")
+            d = d.Define("passCondition_IDIPTrigIso", "passCondition_IDIP && passCondition_Iso && passCondition_clone")
+            d = d.Define("failCondition_IDIPTrigIso", "passCondition_IDIP && passCondition_Iso && !passCondition_clone")
+            d = d.Define("passCondition", "getVariables(TPPairs, passCondition_IDIPTrigIso, 2) && passTPmassclone")
+            d = d.Define("failCondition", "getVariables(TPPairs, failCondition_IDIPTrigIso, 2) || !passTPmassclone")      
+            d = d.Define("TPPairs_pass", "TPPairs[passCondition]")
+            d = d.Define("TPPairs_fail", "TPPairs[failCondition]")
+            d = d.Define("standpt","getVariables(TPPairs, Muon_standalonePt, 2)")
+            d = d.Define("standeta","getVariables(TPPairs, Muon_standaloneEta, 2)")
+            d = d.Define("standclonept","getVariables(TPPairs, Muon_CloneSAPt, 2)")
+            d = d.Define("standcloneeta","getVariables(TPPairs, Muon_CloneSAEta, 2)")
+            # pass probes
+            #d = d.Define("Probe_pt_pass",  "BasicProbe_pt[passCondition]")
+            #d = d.Define("Probe_eta_pass", "BasicProbe_eta[passCondition]")
+            d = d.Define("Probe_pt_pass", "standclonept[passCondition]")
+            d = d.Define("Probe_eta_pass", "standcloneeta[passCondition]")
+            #d = d.Define("TPmass_pass",    "getTPmass(TPPairs_pass, Tag_pt, Tag_eta, Tag_phi, Muon_CloneSAPt, Muon_CloneSAEta, Muon_CloneSAPhi)")
+            d = d.Define("TPmass_pass",    "BasicTPmass[passCondition]")
+            # fail probes
+            #d = d.Define("Probe_pt_fail",  "BasicProbe_pt[failCondition]")
+            #d = d.Define("Probe_eta_fail", "BasicProbe_eta[failCondition]")
+            d = d.Define("Probe_pt_fail", "standpt[failCondition]")
+            d = d.Define("Probe_eta_fail", "standeta[failCondition]")
+            d = d.Define("TPmass_fail",    "BasicTPmass[failCondition]")
+            normFactor = args.normFactor
+            scale = 1.0 if args.isData else (normFactor/weightSum.GetValue()) if args.normalizeMCsumGenWeights else normFactor
+            default_pt_binning = [15., 24., 35., 45., 55., 65.]
+            default_pt_binning = [x for x in default_pt_binning if (x+0.1) >= minHistPt]
+            binning_pt = array('d', default_pt_binning)
+            makeAndSaveHistograms(d, histo_name, "clone", binning_mass, binning_pt, binning_eta, scaleFactor=scale)
 
 elif args.efficiency == 9:
     

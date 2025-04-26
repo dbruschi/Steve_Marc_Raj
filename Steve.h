@@ -269,6 +269,62 @@ RVec<Float_t> trackStandaloneDR(const RVec<Float_t> &Track_eta, const RVec<Float
 	return trackStandaloneDR;
 }
 
+RVec<Float_t> trackStandaloneDRWithExtra(const RVec<Float_t> &Muon_eta, const RVec<Float_t> &Muon_phi, const RVec<Int_t> &Muon_standaloneExtraIdx, const RVec<Float_t> &sa_eta, const RVec<Float_t> &sa_phi, const RVec<Int_t> &sa_extraIdx)
+{
+	RVec<Float_t> trackStandaloneDR(Muon_eta.size(), 999.);
+	for(int iMuon = 0; iMuon < Muon_eta.size(); iMuon++){
+		float dr = 999.;
+		float tmp_dr  = 999.;
+     
+		for (unsigned int isa = 0; isa < sa_eta.size(); ++isa){
+            if (Muon_standaloneExtraIdx[iMuon]==sa_extraIdx[isa]) continue;
+			tmp_dr  = deltaR(sa_eta.at(isa), sa_phi.at(isa), Muon_eta.at(iMuon), Muon_phi.at(iMuon));
+			if (tmp_dr < dr) dr = tmp_dr;
+		}
+		trackStandaloneDR[iMuon] = dr;
+	}
+	return trackStandaloneDR;
+}
+
+RVec<Int_t> trackStandaloneDRWithExtra_MuonIdx(const RVec<Float_t> &Muon_eta, const RVec<Float_t> &Muon_phi, const RVec<Int_t> &Muon_standaloneExtraIdx, const RVec<Float_t> &sa_eta, const RVec<Float_t> &sa_phi, const RVec<Int_t> &sa_extraIdx)
+{
+	RVec<Int_t> trackStandaloneDR(Muon_eta.size(), -1);
+	for(int iMuon = 0; iMuon < Muon_eta.size(); iMuon++){
+		float dr = 999.;
+		float tmp_dr  = 999.;
+     
+		for (unsigned int isa = 0; isa < sa_eta.size(); ++isa){
+            if (Muon_standaloneExtraIdx[iMuon]==sa_extraIdx[isa]) continue;
+			tmp_dr  = deltaR(sa_eta.at(isa), sa_phi.at(isa), Muon_eta.at(iMuon), Muon_phi.at(iMuon));
+			if (tmp_dr < dr) {
+              dr = tmp_dr;
+		      trackStandaloneDR[iMuon] = isa;
+            }
+		}
+	}
+	return trackStandaloneDR;
+}
+
+RVec<Float_t> deltaSApt(const RVec<Float_t> &Sapt1, const RVec<Float_t> &Sapt2) {
+    RVec<Float_t> Vect(Sapt1.size(), 0);
+    for (int iSa = 0; iSa < Sapt1.size(); iSa++) {
+		Vect[iSa] = fabs(Sapt1[iSa]-Sapt2[iSa]);
+	}
+	return Vect;
+}
+
+RVec<Bool_t> cloneglobal(const RVec<Int_t> &Muon_CloneSAIdx, const RVec<Bool_t> &Muon_isGlobal, const RVec<Int_t> &Muon_standaloneExtraIdx, const RVec<Float_t> &Muon_pt, const RVec<Int_t> &saidx) {
+	RVec<Bool_t> Glob(Muon_CloneSAIdx.size(), false);
+	for (unsigned int i=0; i!=Muon_CloneSAIdx.size(); i++) {
+		if (Muon_CloneSAIdx[i]<0) continue;
+		for (unsigned int j=0; j!=Muon_isGlobal.size(); j++) {
+			if (saidx[Muon_CloneSAIdx[i]]==Muon_standaloneExtraIdx[j]) {
+				if ((Muon_isGlobal[j])&&(Muon_pt[j]>10.)) Glob[i] = true;
+			}
+		}
+	}
+	return Glob;
+}
 
 RVec<Float_t> coll1coll2DR(const RVec<Float_t> &coll1_eta, const RVec<Float_t> &coll1_phi,
                            const RVec<Float_t> &coll2_eta, const RVec<Float_t> &coll2_phi)
@@ -661,6 +717,24 @@ template <typename T>
 RVec<T> getMergedStandAloneMuon_matchedObjectVar(const RVec<Int_t> &MergedStandAloneMuon_matchedObjIdx, 
                                                  const RVec<T> &matchedObj_var,
                                                  const T invalidValue = -99)
+{
+    // MergedStandAloneMuon_matchedObjIdx can be created using getMergedStandAloneMuon_MuonIdx if the target collection is Muon,
+    // or getMergedStandAloneMuon_highestPtTrackIdxWithinDR if it is a track
+    // the assumption is that this function will be used only for MergedStandAloneMuon elements for which the corresponding matched object was already checked to exist
+    RVec<T> res(MergedStandAloneMuon_matchedObjIdx.size(), invalidValue); // initialize to default value for invalid indices
+    int index = -1;
+    for (unsigned int i = 0; i < MergedStandAloneMuon_matchedObjIdx.size(); i++) {
+        index = MergedStandAloneMuon_matchedObjIdx[i];
+        if (index >= 0) res[i] = matchedObj_var[index];
+    }
+    return res;
+
+}
+
+template <typename T>
+RVec<T> trackStandaloneDRWithExtra_matchedObjectVar(const RVec<Int_t> &MergedStandAloneMuon_matchedObjIdx, 
+                                                    const RVec<T> &matchedObj_var,
+                                                    const T invalidValue = 1000000)
 {
     // MergedStandAloneMuon_matchedObjIdx can be created using getMergedStandAloneMuon_MuonIdx if the target collection is Muon,
     // or getMergedStandAloneMuon_highestPtTrackIdxWithinDR if it is a track
