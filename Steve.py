@@ -1018,7 +1018,7 @@ elif (args.efficiency < 9) or args.efficiency == 20:
             #d = d.Define("Probe_eta_pass", "BasicProbe_eta[passCondition]")
             d = d.Define("Probe_pt_pass", "standclonept[passCondition]")
             d = d.Define("Probe_eta_pass", "standcloneeta[passCondition]")
-            d = d.Define("TPmass_pass",    "getTPmass(TPPairs_pass, Tag_pt, Tag_eta, Tag_phi, Muon_CloneSAPt, Muon_CloneSAEta, Muon_CloneSAPhi)")
+            d = d.Define("TPmass_pass",    "getTPmass(TPPairs_pass, Tag_pt, Tag_eta, Tag_phi, Muon_standalonePt, Muon_standaloneEta, Muon_standalonePhi)")
             #d = d.Define("TPmass_pass",    "BasicTPmass[passCondition]")
             # fail probes
             #d = d.Define("Probe_pt_fail",  "BasicProbe_pt[failCondition]")
